@@ -81,7 +81,7 @@ foreach ($server in $servers){
         $vmServer | Set-VM -ProcessorCount 2 -AutomaticStartAction Nothing -AutomaticStopAction TurnOff -CheckpointType Disabled
 
     } else {
-        Write-Host "Unable to access VM or VM Disk." -ForegroundColor Red -BackgroundColor Black
+        Write-Verbose "Unable to access VM or VM Disk." -ForegroundColor Red -BackgroundColor Black
     }
 
     if ($server -match "S2D Node") {
