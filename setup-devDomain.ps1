@@ -11,13 +11,19 @@ param(
 
     # Domain DNS suffix (domain.com)
     [Parameter(Mandatory=$True)]
-    [ValidateScript({
-        if ( -not ($_ -match "[a-z0-9\-\.]") ) {
-            Throw "DNSSuffix can contain only alphabetical characters (A-Z), numeric characters (0-9), the minus sign (-), and the period (.). Period characters are allowed only when they are used to delimit the components of domain style names."
-        }
-        if ( -not ([regex]::Matches($_, "[a-z0-9\-]" ).count -le 2) ) {
+    [ValidateScript({        
+        $array = $_.Split(".")
+
+        # does the array not contain two or three items?
+        if ( -not ($array.count -eq 2 -or $array.count -eq 3) ) {
             Throw "This script only supports DNSSuffix that contains one or two periods (.)"
         }
+
+        # for each part of array, does it contain non-word characters?
+        if ( ($array | ForEach-Object { $_ -match "\W" }) -contains $True ) {
+            Throw "DNSSuffix can contain only alphabetical characters (A-Z), numeric characters (0-9), the minus sign (-), and the period (.). Period characters are allowed only when they are used to delimit the components of domain style names."
+        }
+
         return true
     })]    
     [String] $DNSSuffix,
