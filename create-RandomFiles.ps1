@@ -3,12 +3,6 @@
 param(
     # Path
     [Parameter(Mandatory = $true)]
-    [ValidateScript({
-        if(-Not ($_ | Test-Path -PathType Container) ){
-            throw "The Path argument must be a folder. File paths are not allowed."
-        }
-        return $true    
-    })]
     [System.Io.FileInfo] $Path,
 
     # Size MB
@@ -18,6 +12,15 @@ param(
 
 begin{
     $ext = "docx","xml","csv","txt","xlsx","mp3","pptx"
+
+    if (-Not (Test-Path -Path $Path -PathType Container) ){
+        Write-Verbose "PATH: Destination folder does not exist, creating."
+        try {
+            New-Item -ItemType "directory" -Path $path | Out-Null
+        } catch {
+            Throw "Unable to create destination directory."
+        }
+    }
 
     $vol = (Get-Item -Path $Path).Root.Name -replace ("\\","")
     $disk = Get-WmiObject Win32_LogicalDisk -Filter "DeviceID='$vol'"
@@ -36,18 +39,20 @@ begin{
         $no = New-Object System.Management.Automation.Host.ChoiceDescription "&No","Exit."
         $options = [System.Management.Automation.Host.ChoiceDescription[]]($yes, $no)
 
-        $title = "Volume utilization warning"
+        $title = "WARNING: Volume utilization warning"
         $question = "There is less than 20% free on $vol. Do you want to continue?"
         
         $result = $host.UI.PromptForChoice($title,$question,$options,1)
 
         switch($result) {
             0{
-                Write-Verbose "... Volume utilization warning: ACCEPTED"
+                # yes
+                Write-Verbose "... Volume utilization warning, continue: Yes"
             }
             1{
-                Write-Verbose "... Volume utilization warning: IGNORED"
-                Throw "Volume utilization warning: IGNORED"
+                # no
+                Write-Verbose "... Volume utilization warning, continue: No"
+                Throw "Volume utilization warning."
             }
         }
     }
@@ -56,19 +61,41 @@ begin{
 process {
 
     Write-Verbose "Creating files"
+
+    $MaxB = $SizeMB * 1048576
+
     do{
-        $name = (Get-Item -Path $Path).FullName + "random" + (Get-Random -InputObject (10000..99999)) + "." + (Get-Random -InputObject $ext)
-        # $bytes = [math]::pow(1024, (Get-Random -InputObject (1..2))) * (Get-Random -InputObject (1..9))
+        # get folder size, in bytes
+        $FolderB = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
 
-        $bytes = Get-Random -Minimum 1 -Maximum ([Int64]::($SizeMB * 1024))
-    
-        Write-Verbose "... creating $name, size $bytes"
+        # Once we start dealing with larger directories, we can on occasion
+        # generate only a few large files. This will help create a sufficent
+        # number of files.
+        if ($SizeMB -ge 1024) {
+            [Int]$Bytes = $MaxB / 50
+        } else {
+            [Int]$Bytes = $MaxB / 10
+        }
 
-        fsutil file createnew $name $bytes
+        # create new random size, in bytes.
+        $FileB = Get-Random -Minimum 1 -Maximum $Bytes
 
-        $FolderMB = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+        # if new file plus folder size greater than max
+        if ($FolderB + $FileB -gt $MaxB) {
+            $FileB = $MaxB - $FolderB
+        }
+
+        $name = (Get-Item -Path $Path).FullName + "\random" + (Get-Random -InputObject (100000..999999)) + "." + (Get-Random -InputObject $ext)
+        
+        if ($FileB -ne 0) {
+
+            Write-Verbose "... creating $name, size $FileB"
+
+            fsutil file createnew $name $FileB
+        }
+
     } while (
-        $FolderMB -lt $SizeMB   
+        $FolderB -lt $MaxB
     )
 }
 
