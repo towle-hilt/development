@@ -11,7 +11,7 @@ param(
 
     # Domain DNS suffix (domain.com)
     [Parameter(Mandatory=$True)]
-    [ValidateScript({        
+    [ValidateScript({
         $array = $_.Split(".")
 
         # does the array not contain two or three items?
@@ -37,32 +37,45 @@ param(
     [Switch] $CreateDomainOU
 )
 
-Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+begin {
+    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+}
 
-Install-ADDSForest `
-    -CreateDnsDelegation:$false `
-    -DomainMode WinThreshold `
-    -DomainName $DNSSuffix `
-    -DomainNetbiosName $NetBIOS `
-    -ForestMode WinThreshold `
-    -InstallDns:$true `
-    -NoRebootOnCompletion:$true `
-    -SafeModeAdministratorPassword $SafeModeAdministratorPassword `
-    -Force:$true
+process {
 
-$domain = Get-ADDomain $NetBIOS
+    Install-ADDSForest `
+        -CreateDnsDelegation:$false `
+        -DomainMode WinThreshold `
+        -DomainName $DNSSuffix `
+        -DomainNetbiosName $NetBIOS `
+        -ForestMode WinThreshold `
+        -InstallDns:$true `
+        -NoRebootOnCompletion:$true `
+        -SafeModeAdministratorPassword $SafeModeAdministratorPassword `
+        -Force:$true
 
-if ($CreateDomainOU) {
-    $dn = $domain.DistinguishedName
+    # confirm installation
+    $services = "adws","dns","kdc","netlogon"
+    $services = Get-Service | Where-Object { $services -contains $_.Name -and $_.Status -eq 'Running' }
 
-    New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
-    New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
-    New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
+    if ( -not ($services.count -eq 4) ) {
+        Throw "Unable to detect running Domain Servivces, please reboot."
+    }
 
-    New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
+    $domain = Get-ADDomain $NetBIOS
 
-    New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
-    New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
+    if ($CreateDomainOU) {
+        $dn = $domain.DistinguishedName
 
-    New-ADOrganizationalUnit -Name "Servers" -Path "OU=$NetBIOS Computers,$dn"
+        New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
+        New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
+        New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
+
+        New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
+
+        New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
+        New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
+
+        New-ADOrganizationalUnit -Name "Servers" -Path "OU=$NetBIOS Computers,$dn"
+    }
 }
