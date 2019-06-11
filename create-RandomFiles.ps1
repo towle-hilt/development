@@ -18,7 +18,7 @@ begin{
         try {
             New-Item -ItemType "directory" -Path $path | Out-Null
         } catch {
-            Throw "Unable to create destination directory."
+            throw "Unable to create destination directory."
         }
     }
 
@@ -29,7 +29,7 @@ begin{
     Write-Verbose "SIZE: Checking volume utilization"
     if ($disk.FreeSpace/1MB -le $SizeMB) {
         Write-Verbose ("... There is only " + $disk.FreeSpace/1MB + "MB available on $vol")
-        Throw "There is insufficent space on $vol"
+        throw "There is insufficent space on $vol"
     } else {
         Write-Verbose "... SizeMB specified is less than free space."
     }
@@ -52,7 +52,7 @@ begin{
             1{
                 # no
                 Write-Verbose "... Volume utilization warning, continue: No"
-                Throw "Volume utilization warning."
+                throw "Volume utilization warning."
             }
         }
     }
@@ -68,9 +68,9 @@ process {
         # get folder size, in bytes
         $FolderB = (Get-ChildItem $Path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
 
-        # Once we start dealing with larger directories, we can on occasion
-        # generate only a few large files. This will help create a sufficent
-        # number of files.
+        # Once we start dealing with larger sizes, the script may generate
+        # only a few large files. This will help create a sufficent number
+        # of files.
         if ($SizeMB -ge 1024) {
             [Int]$Bytes = $MaxB / 50
         } else {
@@ -80,7 +80,7 @@ process {
         # create new random size, in bytes.
         $FileB = Get-Random -Minimum 1 -Maximum $Bytes
 
-        # if new file plus folder size greater than max
+        # make sure we stay under the max folder size
         if ($FolderB + $FileB -gt $MaxB) {
             $FileB = $MaxB - $FolderB
         }
