@@ -70,12 +70,14 @@ process {
         New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
         New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
         New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
+        New-ADOrganizationalUnit -Name "$NetBIOS Servers" -Path $dn
 
         New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
 
         New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
+        New-ADOrganizationalUnit -Name "Role" -Path "OU=$NetBIOS Groups,$dn"
         New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
 
-        New-ADOrganizationalUnit -Name "Servers" -Path "OU=$NetBIOS Computers,$dn"
+        
     }
 }
