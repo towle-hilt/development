@@ -43,16 +43,18 @@ begin {
 
 process {
 
-    Install-ADDSForest `
-        -CreateDnsDelegation:$false `
-        -DomainMode WinThreshold `
-        -DomainName $DNSSuffix `
-        -DomainNetbiosName $NetBIOS `
-        -ForestMode WinThreshold `
-        -InstallDns:$true `
-        -NoRebootOnCompletion:$true `
-        -SafeModeAdministratorPassword $SafeModeAdministratorPassword `
-        -Force:$true
+    if (-not (Get-ADDomain $NetBIOS)) {
+        Install-ADDSForest `
+            -CreateDnsDelegation:$false `
+            -DomainMode WinThreshold `
+            -DomainName $DNSSuffix `
+            -DomainNetbiosName $NetBIOS `
+            -ForestMode WinThreshold `
+            -InstallDns:$true `
+            -NoRebootOnCompletion:$true `
+            -SafeModeAdministratorPassword $SafeModeAdministratorPassword `
+            -Force:$true
+    }
 
     # confirm installation
     $services = "adws","dns","kdc","netlogon"
@@ -77,7 +79,6 @@ process {
         New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
         New-ADOrganizationalUnit -Name "Role" -Path "OU=$NetBIOS Groups,$dn"
         New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
-
         
     }
 }
