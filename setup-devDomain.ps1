@@ -28,22 +28,52 @@ param(
     })]    
     [String] $DNSSuffix,
 
-    # Domain Safe Mode Admin Pasword
-    [Parameter(Mandatory=$true)]
+    # SafeModeAdministratorPassword
+    [Parameter(Mandatory=$False)]
     [System.Security.SecureString] $SafeModeAdministratorPassword,
 
-    # Create a default OU Structure
-    [Parameter]
-    [Switch] $CreateDomainOU
 )
 
 begin {
+    # If needed, create SafeModeAdministratorPassword
+    if ( -not $SafeModeAdministratorPassword )  {
+
+    function new-Password {
+        param (
+            [Parameter(Mandator)]
+            [switch]$Interactive
+        )
+
+        $password = [system.web.security.membership]::GeneratePassword(8,2)
+
+        if ($Interactive) {
+            Write-Host "`nNew password created:`n`n      $password`n"
+            Set-Clipboard -Value $password
+            Write-Host "This password has been added to your clipboard.`n"
+
+            while ($response -ne "continue") {
+                $response = Read-Host -Prompt "Type 'continue' when you are ready to continue"
+            } 
+            
+            Write-Host "Confirmed, lets continue..."
+            Start-Sleep -Seconds 2
+        }
+
+        $password = ConvertTo-SecureString -String $password -AsPlainText -Force
+
+        return $password
+    }
+
+    if (-not $SafeModeAdministratorPassword) { new-Password -Interactive }
+    
+    
     Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
+
 }
 
 process {
 
-    if (-not (Get-ADDomain $NetBIOS)) {
+    if ( -not (Get-ADDomain $NetBIOS) ) {
         Install-ADDSForest `
             -CreateDnsDelegation:$false `
             -DomainMode WinThreshold `
@@ -65,20 +95,20 @@ process {
     }
 
     $domain = Get-ADDomain $NetBIOS
+    $dn = $domain.DistinguishedName
 
-    if ($CreateDomainOU) {
-        $dn = $domain.DistinguishedName
+    # create ou structure
+    New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
+    New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
+    New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
+    New-ADOrganizationalUnit -Name "$NetBIOS Servers" -Path $dn
 
-        New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
-        New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
-        New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
-        New-ADOrganizationalUnit -Name "$NetBIOS Servers" -Path $dn
+    New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
 
-        New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
+    New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
+    New-ADOrganizationalUnit -Name "Role" -Path "OU=$NetBIOS Groups,$dn"
+    New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
 
-        New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
-        New-ADOrganizationalUnit -Name "Role" -Path "OU=$NetBIOS Groups,$dn"
-        New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
-        
-    }
+    # create new domain admin
+    New-ADUser -
 }
