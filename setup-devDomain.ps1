@@ -38,37 +38,38 @@ begin {
     # If needed, create SafeModeAdministratorPassword
     if ( -not $SafeModeAdministratorPassword )  {
 
-    function new-Password {
-        param (
-            [Parameter(Mandator)]
-            [switch]$Interactive
-        )
+        function new-Password {
+            param (
+                [Parameter(Mandator)]
+                [switch]$Interactive
+            )
 
-        $password = [system.web.security.membership]::GeneratePassword(8,2)
+            $password = [system.web.security.membership]::GeneratePassword(8,2)
 
-        if ($Interactive) {
-            Write-Host "`nNew password created:`n`n      $password`n"
-            Set-Clipboard -Value $password
-            Write-Host "This password has been added to your clipboard.`n"
+            if ($Interactive) {
+                Write-Host "`nNew password created:`n`n      $password`n"
+                Set-Clipboard -Value $password
+                Write-Host "This password has been added to your clipboard.`n"
 
-            while ($response -ne "continue") {
-                $response = Read-Host -Prompt "Type 'continue' when you are ready to continue"
-            } 
-            
-            Write-Host "Confirmed, lets continue..."
-            Start-Sleep -Seconds 2
+                while ($response -ne "continue") {
+                    $response = Read-Host -Prompt "Type 'continue' when you are ready to continue"
+                } 
+                
+                Write-Host "Confirmed, lets continue..."
+                Start-Sleep -Seconds 2
+            }
+
+            $password = ConvertTo-SecureString -String $password -AsPlainText -Force
+
+            return $password
         }
 
-        $password = ConvertTo-SecureString -String $password -AsPlainText -Force
+        if (-not $SafeModeAdministratorPassword) { new-Password -Interactive }
+        
+        
+        Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
 
-        return $password
     }
-
-    if (-not $SafeModeAdministratorPassword) { new-Password -Interactive }
-    
-    
-    Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
-
 }
 
 process {
