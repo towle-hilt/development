@@ -15,28 +15,26 @@ param(
         $array = $_.Split(".")
 
         # does the array not contain two or three items?
-        if ( -not ($array.count -eq 2 -or $array.count -eq 3) ) {
-            Throw "This script only supports DNSSuffix that contains one or two periods (.)"
+        if ( -not ($array.count -in 2,3) ) {
+            Throw "This script only supports DNSSuffix that contains one or two periods (domain.com or internal.domain.com)"
         }
 
         # for each part of array, does it contain non-word characters?
         if ( ($array | ForEach-Object { $_ -match "\W" }) -contains $True ) {
-            Throw "DNSSuffix can contain only alphabetical characters (A-Z), numeric characters (0-9), the minus sign (-), and the period (.). Period characters are allowed only when they are used to delimit the components of domain style names."
+            Throw "DNSSuffix can contain only alphabetical characters (A-Z), numeric characters (0-9), the hyphen (-)."
         }
 
         return true
-    })]    
+    })]
     [String] $DNSSuffix,
 
     # SafeModeAdministratorPassword
     [Parameter(Mandatory=$False)]
-    [System.Security.SecureString] $SafeModeAdministratorPassword,
+    [System.Security.SecureString] $SafeModeAdministratorPassword
 
 )
 
 begin {
-    # If needed, create SafeModeAdministratorPassword
-    if ( -not $SafeModeAdministratorPassword )  {
 
     function new-Password {
         param (
@@ -64,14 +62,17 @@ begin {
         return $password
     }
 
+    # If needed, create SafeModeAdministratorPassword
     if (-not $SafeModeAdministratorPassword) { new-Password -Interactive }
     
-    
+    # Install AD Features
     Install-WindowsFeature -Name AD-Domain-Services -IncludeManagementTools
 
 }
 
 process {
+
+    Write-Verbose "[DOMAIN] Initiating domain setup process."
 
     if ( -not (Get-ADDomain $NetBIOS) ) {
         Install-ADDSForest `
@@ -86,11 +87,15 @@ process {
             -Force:$true
     }
 
-    # confirm installation
+    Write-Verbose "[DOMAIN] ... Domain installed."
+
+    # confirm that the necessary services are running
     $services = "adws","dns","kdc","netlogon"
     $services = Get-Service | Where-Object { $services -contains $_.Name -and $_.Status -eq 'Running' }
 
     if ( -not ($services.count -eq 4) ) {
+        Write-Verbose "[ERROR] Unable to detect running domain services"
+        Write-Verbose "`n $services"
         Throw "Unable to detect running Domain Servivces, please reboot."
     }
 
@@ -98,17 +103,23 @@ process {
     $dn = $domain.DistinguishedName
 
     # create ou structure
-    New-ADOrganizationalUnit -Name "$NetBIOS People" -Path $dn
-    New-ADOrganizationalUnit -Name "$NetBIOS Groups" -Path $dn
-    New-ADOrganizationalUnit -Name "$NetBIOS Computers" -Path $dn
-    New-ADOrganizationalUnit -Name "$NetBIOS Servers" -Path $dn
+    Write-Verbose "[OU] Setup organizational units"
+
+    "People","Groups","Computers","Servers" | ForEach-Object {
+        New-ADOrganizationalUnit -Name "$NetBIOS $_" -Path $dn
+        Write-Verbose "[OU] ... Created OU $_"        
+    }
 
     New-ADOrganizationalUnit -Name "Admins" -Path "OU=$NetBIOS People,$dn"
+    Write-Verbose "[OU] ... Created OU Admins"
 
-    New-ADOrganizationalUnit -Name "Security" -Path "OU=$NetBIOS Groups,$dn"
-    New-ADOrganizationalUnit -Name "Role" -Path "OU=$NetBIOS Groups,$dn"
-    New-ADOrganizationalUnit -Name "Distribution" -Path "OU=$NetBIOS Groups,$dn"
+    "Security","Role","Distribution" | ForEach-Object {
+        New-ADOrganizationalUnit -Name $_ -Path "OU=$NetBIOS Groups,$dn"
+        Write-Verbose "[OU] ... Created OU $_"
+    }
 
-    # create new domain admin
-    New-ADUser -
+    # create initial groups
+    Write-Verbose "[Groups] Setup initial groups"
+    New-ADGroup -Name "sg._svc.$Netbios DomainAdmin" -SamAccountName "sg._svc.$Netbios DomainAdmin" -GroupCategory Security -GroupScope Global -DisplayName "sg._svc.$Netbios DomainAdmin" -Path "OU=Security,OU=$NetBIOS Groups,$dn" -Description "$NetBios Domain Administrator"
+
 }
