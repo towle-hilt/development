@@ -49,7 +49,7 @@ Invoke-Command -ComputerName $server -ScriptBlock {
 
     # Iterate through all remaining physcial disks and wipe
     foreach ($physicalDisk in $physicalDisks) {
-        $disk = $physicalDisk | Get-Disk        
+        $disk = $physicalDisk | Get-Disk
 
         # Make sure disk is Online and not ReadOnly otherwise, display reason
         # and continue
@@ -57,12 +57,12 @@ Invoke-Command -ComputerName $server -ScriptBlock {
         $disk | Set-Disk –IsReadOnly:$false -ErrorAction SilentlyContinue
 
         # Re-instantiate disks to update changes
-        $disk = $physicalDisk | Get-Disk        
+        $disk = $physicalDisk | Get-Disk
 
         if ($disk.IsOffline -or $disk.IsReadOnly) {
         } else {
             # Wipe disk and initialize
-            $disk | ? PartitionStyle -NE "RAW" | Clear-Disk -RemoveData -RemoveOEM -Confirm:$false
+            $disk | Where-Object { $_.PartitionStyle -ne "RAW" } | Clear-Disk -RemoveData -RemoveOEM -Confirm:$false
             $disk | Initialize-Disk -PartitionStyle GPT
         }
     }
