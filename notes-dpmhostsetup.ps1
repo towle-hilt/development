@@ -21,7 +21,7 @@ Invoke-Command -ComputerName $hosts -ScriptBlock {
     Get-VirtualDisk -FriendlyName 'disk0' | Initialize-Disk -PartitionStyle GPT -PassThru
 }
 
-# create volume with appropriate s.ettings for dedupe of vhdx files
+# create volume with appropriate settings for dedupe of vhdx files
 Invoke-Command -ComputerName $hosts -ScriptBlock {
     Get-VirtualDisk -FriendlyName 'disk0' | Get-Disk | New-Partition -AssignDriveLetter -UseMaximumSize | Format-Volume -FileSystem NTFS -AllocationUnitSize 64KB -UseLargeFRS -Force
 }
