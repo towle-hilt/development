@@ -3,7 +3,7 @@ param (
     [String] $AccessKey = "IXU58OGBOKAHMORADATF",
 
     [Parameter(Mandatory=$True)]
-    [String] $SecretKey = "QSGFCACldj9C2hkY4PCIDTr1wbQoyzlYp3IQtMJ9",
+    [String] $SecretKey = "645465465465456465465654564654654654",
 
     [Parameter(Mandatory=$True)]
     [String] $EndpointUrl = "http://s3.us-east-2.wasabisys.com",
